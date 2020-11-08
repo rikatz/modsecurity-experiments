@@ -14,7 +14,9 @@
 * Install the [pymodsec middleware example](https://github.com/pymodsecurity/django-pymodsecurity) - ``python3 setup.py install``
 
 * Configure with the settings.py inside this repo and test Django app
+
 ** Check the basic rules, that blocks only when the req comes from 127.0.0.1 as an example
+
 ** Verify and tune modsecurity rules
 
 ## TODO
