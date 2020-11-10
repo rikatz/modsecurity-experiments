@@ -1,24 +1,17 @@
 """
-Very simple HTTP server in python for logging requests
-and using modsecurity
-Usage::
-    ./server.py <port> <rules-file>
-
-This was based in the following projects/references:
-* https://gist.githubusercontent.com/mdonkers/63e115cc0c79b4f6b8b3a6b797e485c7/raw/a6a1d090ac8549dac8f2bd607bd64925de997d40/server.py
-* https://github.com/pymodsecurity/django-pymodsecurity
+HAProxy SPOA - Modsecurity and Python
+This is a heavily Work in Progress
+Run this with the spoa binary, like: 
+RULES=modsec-rules.conf ./spoa -f modsecurity-spoa.py
 """
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
 import os
 import spoa
-from pprint import pprint
 import ModSecurity
 
 
 class modsectransaction():
     def __init__(self, args):
-        logging.info("Building the object")
         # We create a new self.rules so we can add the IgnoreRules here
         self.rules = modsec.rules
         self.modsec = modsec.modsecurity
@@ -51,10 +44,23 @@ class modsectransaction():
                 # TODO: Should this be parsed?
                 self.reqbody = obj['value']
                 continue
-        # TODO: Validate if all the required fields are here
+            # TODO: Receive additional rulesIDs to be ignored
+
+    def isvalid(self):
+        valid = (
+            hasattr(self, 'url')
+            and hasattr(self, 'method')
+            and hasattr(self, 'path')
+            and hasattr(self, 'query')
+            and hasattr(self, 'reqver')
+            and hasattr(self, 'clientip')
+            and hasattr(self, 'reqhdrs')
+            and hasattr(self, 'reqbody')
+        )
+        return valid
 
     def call_modsec(self):
-        logging.info("Start transaction")
+        # TODO: Can this be configurable? (The SPOE send the information)
         self.transaction.processConnection(self.clientip,
                                            12345,
                                            "127.0.0.1",
@@ -69,6 +75,7 @@ class modsectransaction():
         if response > 0:
             return 1
         '''
+        TODO: Parse headers
         for name, value in sorted(self.headers.items()):
             transaction.addRequestHeader(name, value)
         '''
@@ -78,6 +85,7 @@ class modsectransaction():
             return 1
 
         '''
+        TODO: Parse body
         length = self.headers['Content-Length']
         if length is not None and int(length) > 0:
             field_data = self.rfile.read(int(length))
@@ -93,7 +101,6 @@ class modsectransaction():
         '''
         Check if there's interventions
         : return the apropriate response, if any:
-        : rtype HttpResponse:
         '''
         intervention = ModSecurity.ModSecurityIntervention()
         if intervention is None:
@@ -139,7 +146,14 @@ class ModSec():
 
 def modsecurity(args):
     transaction = modsectransaction(args)
-    pprint(transaction.call_modsec())
+    if transaction.isvalid():
+        response = transaction.call_modsec()
+    else:
+        # TODO: Turn this configurable instead of default denying
+        logging.warning("Received an invalid request, denying")
+        response = 1
+
+    spoa.set_var_int32("intervention", spoa.scope_sess, response)
 
 
 logging.basicConfig(level=logging.INFO)
